@@ -4,9 +4,12 @@ English | [简体中文](README.zh-CN.md)
 
 Repair known camera compatibility problems in Deadlock skin mods with a single PowerShell script.
 
-`AutoFix.ps1` finds your Steam installation, checks installed mod VPKs against the current game files, and repairs recognized outdated camera attachments and lobby camera metadata. Supported repairs are backed up and validated before installation.
+`AutoFix.ps1` finds your Steam installation, checks installed mod VPKs against the current game files, 
+and repairs recognized outdated camera attachments and lobby camera metadata. Supported repairs are backed up and validated before installation.
 
-The script runs independently. An AI agent is optional; Node.js, CMD launchers and companion scripts are not required. This is an unofficial tool, with no affiliation to Valve or skin authors.
+This is an unofficial tool, with no affiliation to Valve or skin authors.
+
+![Running......](docs/images/terminal.png)
 
 ## Requirements
 
@@ -15,27 +18,33 @@ The script runs independently. An AI agent is optional; Node.js, CMD launchers a
 - Internet access for the initial runtime/library download. Later runs reuse cached files.
 - Enough free space for extracted models, original mod backups and repaired archives.
 
-Windows PowerShell 5.1 can launch the script. When needed, it downloads portable PowerShell 7.6.7 to run the same script on .NET 10. Parser libraries are downloaded from GitHub/NuGet with pinned SHA256 checks. No administrator installation or permanent PATH change is required.
+Windows PowerShell 5.1 can launch the script. When needed, it downloads portable PowerShell 7.6.7 to run the same script on .NET 10. 
+Parser libraries are downloaded from GitHub/NuGet with pinned SHA256 checks.
 
 ## Quick start
 
-1. Download [AutoFix.ps1](AutoFix.ps1) with GitHub's **Download raw file**, or download the repository ZIP and extract it. Check that the filename ends in `.ps1`, not `.ps1.txt`.
-2. Open PowerShell in the folder containing `AutoFix.ps1`. The script does not need to be inside the game folder.
-3. Scan your installed mods:
+Exit Deadlock and leave Mod Manager idle, then choose either method below.
 
-   ```powershell
-   .\AutoFix.ps1 -Mode Scan
-   ```
+### Option 1: Download and run manually
 
-4. To repair supported issues, exit Deadlock, leave Mod Manager idle and run:
+1. Download [AutoFix.ps1](https://raw.githubusercontent.com/EatKFCinMc/deadlock_skin_camera_fix/main/AutoFix.ps1)
+2. Open PowerShell in the folder containing the file and run:
 
    ```powershell
    .\AutoFix.ps1
    ```
 
-5. Check the console results. After installation, start the game and test the lobby, movement, crouching, aiming, abilities, death and respawn.
+### Option 2: Download and run with one command
+
+1. Open PowerShell and paste this single line, then run it:
+
+```powershell
+& { $p=Join-Path $env:TEMP 'Deadlock-AutoFix.ps1'; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/EatKFCinMc/deadlock_skin_camera_fix/main/AutoFix.ps1' -OutFile $p -ErrorAction Stop; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p }
+```
 
 Running without arguments selects **Repair** mode and may replace supported mod archives. Use **Scan** when you only want an inspection.
+
+After installation, start Deadlock and check the lobby and in-game camera.
 
 If a downloaded script is blocked, first review the file, then unblock it:
 

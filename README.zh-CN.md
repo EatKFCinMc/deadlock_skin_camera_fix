@@ -2,11 +2,13 @@
 
 [English](README.md) | 简体中文
 
-用一个 PowerShell 脚本修复 Deadlock 皮肤 mod 中已知的摄像机兼容性问题。
+PowerShell 脚本修复 Deadlock 版本更新后皮肤mod中已知的摄像机兼容性问题。
 
 `AutoFix.ps1` 会查找 Steam 游戏目录，将已安装 mod 的 VPK 与当前原版游戏文件比较，修复能够识别的旧版镜头挂点和大厅相机设置。安装前会备份原包，并校验修复结果。
 
-脚本可以独立运行，AI agent 为可选用法，不需要 Node.js、CMD 启动器或其他辅助脚本。本项目为非官方工具，与 Valve 和皮肤作者没有隶属关系。
+本项目为非官方工具，与 Valve 和皮肤作者没有隶属关系。
+
+![运行中](docs/images/terminal.png)
 
 ## 运行要求
 
@@ -15,27 +17,32 @@
 - 首次下载运行环境和解析库时需要联网，之后复用缓存。
 - 足够的磁盘空间，用于提取模型、备份原 mod 和生成修复包。
 
-可以从 Windows 自带的 PowerShell 5.1 启动。必要时，脚本会下载便携版 PowerShell 7.6.7，在 .NET 10 上重新执行同一个脚本。解析库从 GitHub/NuGet 下载，并检查固定 SHA256。不需要管理员安装，也不永久修改 PATH。
+可以从 Windows 自带的 PowerShell 5.1 启动。必要时，脚本会下载便携版 PowerShell 7.6.7，在 .NET 10 上重新执行同一个脚本。解析库从 GitHub/NuGet 下载，并检查固定 SHA256。
 
 ## 快速开始
 
-1. 打开 [AutoFix.ps1](AutoFix.ps1)，使用 GitHub 的 **Download raw file** 下载；也可以下载整个仓库 ZIP 后解压。确认扩展名为 `.ps1`，不是 `.ps1.txt`。
-2. 在 `AutoFix.ps1` 所在目录打开 PowerShell。脚本不需要放在游戏目录内。
-3. 先扫描已安装的 mod：
+先退出 Deadlock，让 Mod Manager 保持空闲，然后选择下面任意一种方式。
 
-   ```powershell
-   .\AutoFix.ps1 -Mode Scan
-   ```
+### 方式一：手动下载运行
 
-4. 需要修复时，退出 Deadlock，让 Mod Manager 保持空闲，然后运行：
+1. 下载 [AutoFix.ps1](https://raw.githubusercontent.com/EatKFCinMc/deadlock_skin_camera_fix/main/AutoFix.ps1)
+2. 在文件所在目录打开 PowerShell，运行：
 
    ```powershell
    .\AutoFix.ps1
    ```
 
-5. 查看控制台结果。安装完成后启动游戏，检查大厅、移动、蹲下、瞄准、技能、死亡和复活。
+### 方式二：一行命令下载并运行
+
+1. 打开 PowerShell，复制粘贴这一整行，并运行：
+
+```powershell
+& { $p=Join-Path $env:TEMP 'Deadlock-AutoFix.ps1'; Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/EatKFCinMc/deadlock_skin_camera_fix/main/AutoFix.ps1' -OutFile $p -ErrorAction Stop; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p }
+```
 
 不带参数运行时，默认执行 **Repair**，可能替换支持修复的 mod 包。只想检查时，请使用 **Scan**。
+
+安装完成后，启动 Deadlock 检查大厅和游戏内相机。
 
 如果下载的脚本被阻止运行，先检查文件内容，再解除锁定：
 
