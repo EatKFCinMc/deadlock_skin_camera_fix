@@ -154,16 +154,16 @@ using ValveResourceFormat.ResourceTypes;
 public static class CameraRepair {
  static readonly HashSet<string> CameraNames=new HashSet<string>(new[]{"standing_pivot","crouching_pivot","portrait_camera","portrait_camera_attach","near_00","near_01","near_02","far_00","far_01","far_02","gunaim_00","gunaim_01","gunaim_02"});
  static string GameMetadata(KVObject data) => string.Join(";",data.Children.Where(p=>p.Key!="AttachmentCameraData"&&p.Key!="CitadelModelSceneData_t").Select(p=>p.Key+":"+Fingerprint(p.Value)));
- static string Fingerprint(KVObject value, string path="") {
+ static string Fingerprint(KVObject value, string path="",HashSet<string> cameraNames=null) {
   if(path=="m_modelInfo/m_keyValueText")return "<camera-metadata>";
   if(value.IsCollection) {
    var text=new StringBuilder(value.ValueType.ToString());
    foreach(var pair in value.Children) {
     if(path=="" && pair.Key=="m_attachments") {
-     foreach(var entry in pair.Value.Values)if(!CameraNames.Contains((string)entry["key"]))text.Append(Fingerprint(entry));
+     foreach(var entry in pair.Value.Values)if(!(cameraNames??CameraNames).Contains((string)entry["key"]))text.Append(Fingerprint(entry));
      continue;
     }
-    text.Append(pair.Key).Append(':').Append(Fingerprint(pair.Value,path.Length==0?pair.Key:path+"/"+pair.Key)).Append(';');
+    text.Append(pair.Key).Append(':').Append(Fingerprint(pair.Value,path.Length==0?pair.Key:path+"/"+pair.Key,cameraNames)).Append(';');
    }
    return text.ToString();
   }
@@ -190,7 +190,8 @@ public static class CameraRepair {
  // Bone.BindPose is PARENT-LOCAL, not model-space. An identity child therefore
  // uses its parent's attachment coordinates without an extra rotation or offset.
  static bool CanAliasLobby(Model mod,Model original,string camera,KVObject value) {
-  if(camera!="portrait_camera_attach" || (int)value["m_nInfluences"]!=1 || (bool)value["m_bIgnoreRotation"])return false;
+  const string lobbyPrefix="portrait_camera_attach";
+  if(!camera.StartsWith(lobbyPrefix,StringComparison.Ordinal) || !camera.Substring(lobbyPrefix.Length).All(char.IsDigit) || !RequiredCameras(original).Contains(camera) || (int)value["m_nInfluences"]!=1 || (bool)value["m_bIgnoreRotation"])return false;
   if((string)value["m_influenceNames"][0]!="attachWorld" || Math.Abs((double)value["m_influenceWeights"][0]-1)>0.00001 || (bool)value["m_bInfluenceRootTransform"][0])return false;
   var helper=original.Skeleton.Bones.FirstOrDefault(b=>b.Name=="attachWorld");
   var root=original.Skeleton.Bones.FirstOrDefault(b=>b.Name=="root_motion");
@@ -205,7 +206,7 @@ public static class CameraRepair {
   var bones=new HashSet<string>(mod.Skeleton.Bones.Select(b=>b.Name));var required=RequiredCameras(original);
   missingBones=new HashSet<string>();remapped=new List<string>();var source=new Dictionary<string,KVObject>();
   foreach(var block in originalResource.Blocks.OfType<Mesh>())foreach(var entry in block.Data["m_attachments"].Values) {
-   string name=(string)entry["key"];if(!CameraNames.Contains(name) || source.ContainsKey(name))continue;
+   string name=(string)entry["key"];if((!CameraNames.Contains(name)&&!required.Contains(name)) || source.ContainsKey(name))continue;
    var copy=entry;var value=entry["value"];
    if(!bones.Contains("attachWorld") && CanAliasLobby(mod,original,name,value)) {
     copy=KVObject.Collection(entry.Children);var adapted=KVObject.Collection(value.Children);
@@ -239,17 +240,17 @@ public static class CameraRepair {
   else status="review-needed";
   CameraPlan(modResource,originalResource,out missingBones,out var remappedBones);
   var names=new HashSet<string>(mod.Skeleton.Bones.Select(b=>b.Name));
-  bool invalidLobby=remappedBones.Count>0 && (!mod.Attachments.TryGetValue("portrait_camera_attach",out var lobby) || lobby.Any(i=>i.Weight>0&&!names.Contains(i.Name)));
+  bool invalidLobby=remappedBones.Any(mapping=>{string name=mapping.Substring(0,mapping.IndexOf(':'));return !mod.Attachments.TryGetValue(name,out var lobby) || lobby.Any(i=>i.Weight>0&&!names.Contains(i.Name));});
   if(status=="camera-matches"&&invalidLobby)status="outdated";
   if((status=="outdated" || status=="camera-matches")&&missingBones.Count>0)status="unsupported";
   return System.Text.Json.JsonSerializer.Serialize(new {status,changed,missing,oldAxis,missingBones,remappedBones,reason=status=="outdated"?(oldAxis.Count>0?"Known old-axis camera signature":"Known lobby camera reference requires root binding adaptation"):status=="unsupported"?"Required camera bones are absent and no verified binding adaptation applies":status=="review-needed"?"Camera differs without a recognized old-axis signature; left unchanged":"Gameplay camera attachments match current vanilla"});
  }
  public static void Run(Resource mod, Resource orig, string output) {
+  var cameraNames=new HashSet<string>(CameraNames);cameraNames.UnionWith(RequiredCameras((Model)orig.DataBlock));
   var snapshots=new Dictionary<int,string>();
-  for(int i=0;i<mod.Blocks.Count;i++)if(mod.Blocks[i] is Mesh mesh)snapshots[i]=Fingerprint(mesh.Data);
+  for(int i=0;i<mod.Blocks.Count;i++)if(mod.Blocks[i] is Mesh mesh)snapshots[i]=Fingerprint(mesh.Data,cameraNames:cameraNames);
   string dataSnapshot=Fingerprint(((Model)mod.DataBlock).Data);
   string metadataSnapshot=GameMetadata(((Model)mod.DataBlock).KeyValues);
-  var cameraNames = CameraNames;
   var source=CameraPlan(mod,orig,out var missingBones,out var remappedBones);
   if(missingBones.Count>0)throw new Exception("Camera bones missing from mod: "+string.Join(", ",missingBones));
   foreach(string mapping in remappedBones)Console.WriteLine("Adapted lobby binding: "+mapping);
@@ -322,7 +323,7 @@ public static class CameraRepair {
     var old=mod.Blocks[i];var block=check.Blocks[i];
     if(block.Type!=old.Type)throw new Exception("Block type changed");
     if(block is Mesh mesh) {
-     if(Fingerprint(mesh.Data)!=snapshots[i])throw new Exception("Mesh geometry or material data changed");
+     if(Fingerprint(mesh.Data,cameraNames:cameraNames)!=snapshots[i])throw new Exception("Mesh geometry or material data changed");
      foreach(var entry in mesh.Data["m_attachments"].Values) {
       string name=(string)entry["key"];
       if(source.TryGetValue(name,out var reference) && Fingerprint(entry["value"])!=Fingerprint(reference["value"]))throw new Exception("Camera attachment verification failed: "+name);
